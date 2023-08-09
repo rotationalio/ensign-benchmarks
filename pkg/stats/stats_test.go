@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/rotationalio/ensign-benchmarks/stats"
+	"github.com/rotationalio/ensign-benchmarks/pkg/stats"
 	"github.com/stretchr/testify/require"
 )
 
