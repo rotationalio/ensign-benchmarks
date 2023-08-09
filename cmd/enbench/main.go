@@ -23,19 +23,33 @@ func main() {
 	app.Name = "enbench"
 	app.Version = benchmarks.Version()
 	app.Usage = "run and manage ensign server benchmarks"
-	app.Flags = []cli.Flag{}
+	app.Flags = []cli.Flag{
+		&cli.StringFlag{
+			Name:    "credentials",
+			Aliases: []string{"c"},
+			Usage:   "path to json credentials file",
+		},
+		&cli.StringFlag{
+			Name:    "endpoint",
+			Aliases: []string{"e"},
+			Value:   "staging.ensign.world:443",
+			Usage:   "specify an ensign endpoint other than staging",
+			EnvVars: []string{"ENSIGN_ENDPOINT"},
+		},
+		&cli.StringFlag{
+			Name:    "auth-url",
+			Aliases: []string{"a"},
+			Value:   "https://auth.ensign.world",
+			Usage:   "specify an ensign auth url other than staging",
+			EnvVars: []string{"ENSIGN_AUTH_URL"},
+		},
+	}
 	app.Commands = []*cli.Command{
 		{
 			Name:   "blast",
 			Usage:  "run a blast benchmark",
 			Action: runBlast,
 			Flags: []cli.Flag{
-				&cli.StringFlag{
-					Name:    "addr",
-					Aliases: []string{"a"},
-					Usage:   "the address to connect to the ensign server on",
-					Value:   "127.0.0.1:7777",
-				},
 				&cli.Uint64Flag{
 					Name:    "operations",
 					Aliases: []string{"N"},
