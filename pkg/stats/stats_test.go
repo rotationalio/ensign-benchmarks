@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/rotationalio/ensign-benchmarks/stats"
+	"github.com/rotationalio/ensign-benchmarks/pkg/stats"
 	"github.com/stretchr/testify/require"
 )
 
@@ -222,11 +222,11 @@ func TestStatisticsAppend(t *testing.T) {
 }
 
 func BenchmarkStatistics_Update(b *testing.B) {
-	rand.Seed(42)
+	random := rand.New(rand.NewSource(42))
 	stats := stats.New()
 
 	for i := 0; i < b.N; i++ {
-		val := rand.Float64()
+		val := random.Float64()
 		stats.Update(val)
 	}
 }

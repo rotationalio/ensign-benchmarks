@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rotationalio/ensign-benchmarks/stats"
+	"github.com/rotationalio/ensign-benchmarks/pkg/stats"
 	"github.com/stretchr/testify/require"
 )
 
@@ -248,11 +248,11 @@ func TestBenchmarkAppend(t *testing.T) {
 }
 
 func BenchmarkLatencies_Update(b *testing.B) {
-	rand.Seed(42)
+	random := rand.New(rand.NewSource(42))
 	stats := &stats.Latencies{}
 
 	for i := 0; i < b.N; i++ {
-		val := time.Duration(rand.Int31n(1000)) * time.Millisecond
+		val := time.Duration(random.Int31n(1000)) * time.Millisecond
 		stats.Update(val)
 	}
 }

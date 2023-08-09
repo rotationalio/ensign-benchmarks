@@ -15,6 +15,7 @@
 # vendor/
 
 .secret
+.archive
 
 .mod-cache
 .terraform

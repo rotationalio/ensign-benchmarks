@@ -3,7 +3,7 @@ package metrics
 import (
 	"encoding/json"
 
-	benchmarks "github.com/rotationalio/ensign-benchmarks"
+	benchmarks "github.com/rotationalio/ensign-benchmarks/pkg"
 )
 
 type Metrics map[string]interface{}

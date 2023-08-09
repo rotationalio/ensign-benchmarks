@@ -12,12 +12,13 @@ import (
 	"sync"
 	"time"
 
-	benchmarks "github.com/rotationalio/ensign-benchmarks"
-	"github.com/rotationalio/ensign-benchmarks/metrics"
-	"github.com/rotationalio/ensign-benchmarks/options"
-	"github.com/rotationalio/ensign-benchmarks/stats"
-	api "github.com/rotationalio/ensign/pkg/api/v1beta1"
-	mimetype "github.com/rotationalio/ensign/pkg/mimetype/v1beta1"
+	"github.com/oklog/ulid/v2"
+	benchmarks "github.com/rotationalio/ensign-benchmarks/pkg"
+	"github.com/rotationalio/ensign-benchmarks/pkg/metrics"
+	"github.com/rotationalio/ensign-benchmarks/pkg/options"
+	"github.com/rotationalio/ensign-benchmarks/pkg/stats"
+	api "github.com/rotationalio/go-ensign/api/v1beta1"
+	mimetype "github.com/rotationalio/go-ensign/mimetype/v1beta1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -59,19 +60,23 @@ func (b *Blast) Run(ctx context.Context) (err error) {
 	b.latencies = make([]time.Duration, N)
 	results := make([]bool, N)
 
+	topicID := ulid.Make()
+
 	// Create requests so they don't interfere with the benchmark
-	requests := make([]*api.Event, N)
+	requests := make([]*api.EventWrapper, N)
 	for i := uint64(0); i < N; i++ {
-		requests[i] = &api.Event{
-			TopicId:  "benchmark",
+		requests[i] = &api.EventWrapper{
+			TopicId: topicID[:],
+		}
+		requests[i].Wrap(&api.Event{
 			Mimetype: mimetype.ApplicationOctetStream,
 			Type: &api.Type{
-				Name:    "Random",
-				Version: 1,
+				Name:         "Random",
+				MajorVersion: 1,
 			},
 			Data:    generateRandomBytes(int(S)),
 			Created: timestamppb.Now(),
-		}
+		})
 	}
 
 	// TODO: initialize the client as a separate object
@@ -120,7 +125,12 @@ func (b *Blast) Run(ctx context.Context) (err error) {
 				start: time.Now(),
 			}
 
-			if err := stream.Send(event); err == nil {
+			req := &api.PublisherRequest{
+				Embed: &api.PublisherRequest_Event{
+					Event: event,
+				},
+			}
+			if err := stream.Send(req); err == nil {
 				sentat <- ts
 			}
 

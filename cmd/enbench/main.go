@@ -8,9 +8,9 @@ import (
 	"os"
 
 	"github.com/joho/godotenv"
-	benchmarks "github.com/rotationalio/ensign-benchmarks"
-	"github.com/rotationalio/ensign-benchmarks/blast"
-	"github.com/rotationalio/ensign-benchmarks/options"
+	benchmarks "github.com/rotationalio/ensign-benchmarks/pkg"
+	"github.com/rotationalio/ensign-benchmarks/pkg/blast"
+	"github.com/rotationalio/ensign-benchmarks/pkg/options"
 	"github.com/urfave/cli/v2"
 )
 
