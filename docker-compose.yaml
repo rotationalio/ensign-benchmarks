@@ -1,0 +1,54 @@
+version: "3"
+services:
+
+  quarterdeck:
+    image: rotationalio/quarterdeck:v0.8.0
+    restart: unless-stopped
+    init: true
+    ports:
+      - 8088:8088
+    volumes:
+      - ./fixtures/quarterdeck/db:/data/db
+    environment:
+      - QUARTERDECK_CONSOLE_LOG=true
+      - QUARTERDECK_SENDGRID_TESTING=true
+      - QUARTERDECK_REPORTING_ENABLE_DAILY_PLG=false
+      - QUARTERDECK_DATABASE_URL=sqlite3:////data/db/quarterdeck.db
+      - QUARTERDECK_DATABASE_READ_ONLY=true
+    logging:
+      driver: none
+
+  ensign:
+    image: rotationalio/ensign:v0.8.0
+    restart: unless-stopped
+    init: true
+    ports:
+      - 5356:5356
+    depends_on:
+      - quarterdeck
+    volumes:
+      - ./fixtures/ensign:/data/db
+    environment:
+      - ENSIGN_CONSOLE_LOG=true
+      - ENSIGN_META_TOPIC_ENABLED=false
+      - ENSIGN_MONITORING_ENABLED=false
+      - ENSIGN_STORAGE_DATA_PATH=/data/db
+      - ENSIGN_AUTH_KEYS_URL=http://quarterdeck:8088/.well-known/jwks.json
+    logging:
+      driver: none
+
+  benchmark:
+    build:
+      context: .
+      dockerfile: ./
+      args:
+        GIT_REVISION: ${GIT_REVISION}
+    image: rotationalio/benchmarks
+    init: true
+    depends_on:
+      - ensign
+    environment:
+      - ENSIGN_CLIENT_ID
+      - ENSIGN_CLEINT_SECRET
+    logging:
+      driver: none
