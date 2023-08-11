@@ -4,16 +4,19 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"os"
+	"os/signal"
 	"time"
 
 	"github.com/joho/godotenv"
 	benchmarks "github.com/rotationalio/ensign-benchmarks/pkg"
 	"github.com/rotationalio/ensign-benchmarks/pkg/blast"
 	"github.com/rotationalio/ensign-benchmarks/pkg/options"
+	"github.com/rotationalio/ensign-benchmarks/pkg/sustain"
 	"github.com/rotationalio/go-ensign"
 	api "github.com/rotationalio/go-ensign/api/v1beta1"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"github.com/urfave/cli/v2"
 )
 
@@ -73,6 +76,45 @@ func main() {
 			},
 		},
 		{
+			Name:   "sustain",
+			Usage:  "run a sustain benchmark",
+			Before: configure,
+			Action: runSustain,
+			Flags: []cli.Flag{
+				&cli.DurationFlag{
+					Name:    "interval",
+					Aliases: []string{"i"},
+					Value:   1250 * time.Millisecond,
+					Usage:   "the interval between publishing events",
+				},
+				&cli.Uint64Flag{
+					Name:    "operations",
+					Aliases: []string{"N"},
+					Value:   0,
+					Usage:   "the maximum number of events to publish (0 runs until stopped)",
+				},
+				&cli.Int64Flag{
+					Name:    "data-size",
+					Aliases: []string{"S"},
+					Value:   256,
+					Usage:   "the size in bytes of the payloads to send",
+				},
+			},
+		},
+		{
+			Name:   "listen",
+			Usage:  "listen for events on the specified topic",
+			Before: configure,
+			Action: listen,
+			Flags: []cli.Flag{
+				&cli.StringSliceFlag{
+					Name:    "topic",
+					Aliases: []string{"t"},
+					Usage:   "specify the topics to subscribe to",
+				},
+			},
+		},
+		{
 			Name:   "check",
 			Usage:  "check that the benchmarks can run successfully",
 			Before: configure,
@@ -81,7 +123,7 @@ func main() {
 	}
 
 	if err := app.Run(os.Args); err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Msg("could not start cli app")
 	}
 }
 
@@ -129,6 +171,58 @@ func runBlast(c *cli.Context) (err error) {
 
 	fmt.Println(string(data))
 	return nil
+}
+
+func runSustain(c *cli.Context) (err error) {
+	conf.Interval = c.Duration("interval")
+	conf.Operations = c.Uint64("operations")
+	conf.DataSize = c.Int64("data-size")
+
+	b := sustain.New(conf)
+	if err = b.Run(context.Background()); err != nil {
+		return cli.Exit(err, 1)
+	}
+	return nil
+}
+
+func listen(c *cli.Context) (err error) {
+	var client *ensign.Client
+	if client, err = ensign.New(conf.Ensign()...); err != nil {
+		return cli.Exit(err, 1)
+	}
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, os.Interrupt)
+
+	var sub *ensign.Subscription
+	topics := c.StringSlice("topic")
+	if sub, err = client.Subscribe(topics...); err != nil {
+		return cli.Exit(err, 1)
+	}
+
+	for {
+		select {
+		case <-quit:
+			return nil
+		case event := <-sub.C:
+			lgc := zerolog.Dict()
+			for key, val := range event.Metadata {
+				lgc.Str(key, val)
+			}
+
+			log.Info().
+				Dict("metadata", lgc).
+				Str("type", fmt.Sprintf("%s v%s", event.Type.Name, event.Type.Semver())).
+				Str("mimetype", event.Mimetype.MimeType()).
+				Int("data_size", len(event.Data)).
+				Time("created", event.Created).
+				Msg("event recv")
+
+			if _, err := event.Ack(); err != nil {
+				log.Error().Err(err).Msg("could not ack event")
+			}
+		}
+	}
 }
 
 func check(c *cli.Context) (err error) {
