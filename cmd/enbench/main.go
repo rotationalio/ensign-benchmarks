@@ -120,6 +120,13 @@ func main() {
 			Before: configure,
 			Action: check,
 		},
+		{
+			Name:      "mktopic",
+			Usage:     "create the specified topic(s) in your project",
+			ArgsUsage: "topic [topic ...]",
+			Before:    configure,
+			Action:    createTopic,
+		},
 	}
 
 	if err := app.Run(os.Args); err != nil {
@@ -259,5 +266,27 @@ func check(c *cli.Context) (err error) {
 	}
 
 	fmt.Println(string(data))
+	return nil
+}
+
+func createTopic(c *cli.Context) (err error) {
+	var client *ensign.Client
+	if client, err = ensign.New(conf.Ensign()...); err != nil {
+		return cli.Exit(err, 1)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	for i := 0; i < c.NArg(); i++ {
+		var topicID string
+		topic := c.Args().Get(i)
+		if topicID, err = client.CreateTopic(ctx, topic); err != nil {
+			return cli.Exit(err, 1)
+		}
+
+		log.Printf("topic %s created with id %s\n", topic, topicID)
+	}
+
 	return nil
 }
