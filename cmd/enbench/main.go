@@ -13,11 +13,13 @@ import (
 	"github.com/rotationalio/ensign-benchmarks/pkg/blast"
 	"github.com/rotationalio/ensign-benchmarks/pkg/options"
 	"github.com/rotationalio/ensign-benchmarks/pkg/sustain"
+	"github.com/rotationalio/ensign-benchmarks/pkg/workload"
 	"github.com/rotationalio/go-ensign"
 	api "github.com/rotationalio/go-ensign/api/v1beta1"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/urfave/cli/v2"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 func main() {
@@ -126,6 +128,43 @@ func main() {
 			ArgsUsage: "topic [topic ...]",
 			Before:    configure,
 			Action:    createTopic,
+		},
+		{
+			Name:   "testdata",
+			Usage:  "generate testdata with duplicates",
+			Action: mktestdata,
+			Flags: []cli.Flag{
+				&cli.IntFlag{
+					Name:    "size",
+					Aliases: []string{"s"},
+					Usage:   "number of events to generate for the test",
+					Value:   1000,
+				},
+				&cli.IntFlag{
+					Name:    "num-keys",
+					Aliases: []string{"k"},
+					Usage:   "specify the number of available keys to add to events",
+					Value:   20,
+				},
+				&cli.Float64Flag{
+					Name:    "new-key-prob",
+					Aliases: []string{"p"},
+					Usage:   "specify the probability a new key value is generated",
+					Value:   0.6,
+				},
+				&cli.Float64Flag{
+					Name:    "duplicate-prob",
+					Aliases: []string{"d"},
+					Usage:   "specify the probability of duplicates in the dataset",
+					Value:   0.1,
+				},
+				&cli.StringFlag{
+					Name:    "out",
+					Aliases: []string{"o"},
+					Usage:   "the location to write the data out to",
+					Value:   "events.pb.json",
+				},
+			},
 		},
 	}
 
@@ -286,6 +325,53 @@ func createTopic(c *cli.Context) (err error) {
 		}
 
 		log.Printf("topic %s created with id %s\n", topic, topicID)
+	}
+
+	return nil
+}
+
+func mktestdata(c *cli.Context) (err error) {
+	nEvents := c.Int("size")
+	nKeys := c.Int("num-keys")
+	newKeyProb := c.Float64("new-key-prob")
+	dupProb := c.Float64("duplicate-prob")
+	out := c.String("out")
+
+	pbjson := protojson.MarshalOptions{
+		UseProtoNames:   true,
+		UseEnumNumbers:  false,
+		EmitUnpopulated: false,
+	}
+
+	data := make([]map[string]interface{}, 0, nEvents)
+	gen := workload.NewRandomDuplicates(nKeys, newKeyProb, dupProb)
+
+	for i := 0; i < nEvents; i++ {
+		event := gen.Next()
+
+		var serial []byte
+		if serial, err = pbjson.Marshal(event); err != nil {
+			return cli.Exit(err, 1)
+		}
+
+		obj := make(map[string]interface{})
+		if err = json.Unmarshal(serial, &obj); err != nil {
+			return cli.Exit(err, 1)
+		}
+
+		data = append(data, obj)
+	}
+
+	var f *os.File
+	if f, err = os.Create(out); err != nil {
+		return cli.Exit(err, 1)
+	}
+	defer f.Close()
+
+	encoder := json.NewEncoder(f)
+	encoder.SetIndent("", "  ")
+	if err = encoder.Encode(data); err != nil {
+		return cli.Exit(err, 1)
 	}
 
 	return nil
